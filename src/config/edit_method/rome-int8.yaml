@@ -1,0 +1,3 @@
+identifier: rome-int8
+description: "ROME edit, then symmetric per-tensor int8 fake quantization of all MLP weights."
+factory: src.editing.obfuscated:RomeInt8

@@ -121,7 +121,9 @@ def restore(handler: Any, outcome: Optional[EditOutcome]) -> None:
     if outcome is None:
         return
     for module_name, old_weight in outcome.restorations.items():
-        handler._get_module(module_name).weight = torch.nn.Parameter(old_weight)
+        module = handler._get_module(module_name)
+        # Restorations may be held on CPU; put each one back on its module's device.
+        module.weight = torch.nn.Parameter(old_weight.to(module.weight.device))
 
 
 def run_edit_method(

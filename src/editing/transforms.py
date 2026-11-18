@@ -29,15 +29,17 @@ def fake_quantize(
 
     values = weight.detach().float()
     qmax = 2 ** (bits - 1) - 1
+    tiny = torch.finfo(torch.float32).tiny
     if granularity == "tensor":
-        absmax = values.abs().max()
+        scale = values.abs().max().clamp(min=tiny) / qmax
+        dequantized = torch.fake_quantize_per_tensor_affine(values, scale, 0, -qmax, qmax)
     else:
-        reduce_dims = tuple(dim for dim in range(values.dim()) if dim != channel_dim % values.dim())
-        absmax = values.abs().amax(dim=reduce_dims, keepdim=True)
-
-    scale = absmax.clamp(min=torch.finfo(torch.float32).tiny) / qmax
-    quantized = torch.clamp(torch.round(values / scale), -qmax, qmax)
-    return (quantized * scale).to(dtype=weight.dtype, device=weight.device)
+        axis = channel_dim % values.dim()
+        reduce_dims = tuple(dim for dim in range(values.dim()) if dim != axis)
+        scale = values.abs().amax(dim=reduce_dims).clamp(min=tiny) / qmax
+        zero_point = torch.zeros_like(scale, dtype=torch.int32)
+        dequantized = torch.fake_quantize_per_channel_affine(values, scale, zero_point, axis, -qmax, qmax)
+    return dequantized.to(dtype=weight.dtype, device=weight.device)
 
 
 def magnitude_prune(
